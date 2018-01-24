@@ -1,0 +1,6 @@
+auth.txt
+userlist.txt
+*.pyc
+.DS_Store
+.*.swp
+__pycache__
