@@ -4,3 +4,5 @@ userlist.txt
 .DS_Store
 .*.swp
 __pycache__
+tweets/*
+map/*
