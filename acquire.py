@@ -41,9 +41,9 @@ def getUserTweets(api, username, tweetdir, numtweets):
 		mentions = getMentionsFromText(tweet.text)
 		date = tweet.created_at
 		text = tweet.text
-		source = tweet.user.name
+		source = tweet.user.screen_name
 		if( hasattr(tweet, "retweeted_status") ):
-			orig_author = tweet.retweeted_status.user.name
+			orig_author = tweet.retweeted_status.user.screen_name
 			rt_count = tweet.retweeted_status.retweet_count
 			rt = Retweet(source, text, date, mentions, orig_author, rt_count)
 			tweets.append(rt)
@@ -75,13 +75,15 @@ def deleteUserTweets(username, tweetdir):
 	os.unlink(tweetdir + "/" + username + ".json")
 
 def getLayers(api, numLayers, options, userlist):
-	nextLayerRTs = set()
-	nextLayerMentions = set()
+	nextLayerRTs = dict()
+	nextLayerMentions = dict()
 	for username in userlist:
 		if( not userTweetsPresent(username, options.tweetdir) ):
 			getUserTweets(api, username, options.tweetdir, options.numtweets)
 			mentions, rts = getUserReferences(username, options.tweetdir, options.workdir)
-			for user in mentions:
-				nextLayerMentions.add(user)
-			for user in rts:
-				nextLayerRTs.add(user)
+			if( len(rts) > 0 ):
+				nextLayerRTs[username] = list(rts)
+			if( len(mentions) > 0 ):
+				nextLayerMentions[username] = list(mentions)
+	print("Next layer retweets: ", nextLayerRTs)
+	print("Next layer mentions: ", nextLayerMentions)
