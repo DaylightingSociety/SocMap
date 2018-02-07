@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Dependencies
-import tweepy, os, jsonpickle
+import tweepy, os, jsonpickle, re
 
 class Tweet(object):
 	def __init__(self, user, text, timestamp, mentions):
@@ -31,7 +31,12 @@ def userTweetsPresent(username, tweetdir):
 
 # Returns the usernames of people mentioned in a body of text
 def getMentionsFromText(text):
-	return []
+	usernames = set()
+	p = re.compile("@[A-Za-z0-9_]+")
+	res = p.findall(text)
+	for username in res:
+		usernames.add(username[1:].lower())
+	return list(usernames)
 
 # Downloads, parses, and saves tweets for a user
 def getUserTweets(api, username, tweetdir, numtweets):
@@ -41,9 +46,9 @@ def getUserTweets(api, username, tweetdir, numtweets):
 		mentions = getMentionsFromText(tweet.text)
 		date = tweet.created_at
 		text = tweet.text
-		source = tweet.user.screen_name
+		source = tweet.user.screen_name.lower()
 		if( hasattr(tweet, "retweeted_status") ):
-			orig_author = tweet.retweeted_status.user.screen_name
+			orig_author = tweet.retweeted_status.user.screen_name.lower()
 			rt_count = tweet.retweeted_status.retweet_count
 			rt = Retweet(source, text, date, mentions, orig_author, rt_count)
 			tweets.append(rt)

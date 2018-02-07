@@ -76,7 +76,7 @@ def getUsernames(filename):
 	lines = f.readlines()
 	f.close()
 	for line in lines:
-		usernames.append(line.rstrip())
+		usernames.append(line.rstrip().lower())
 	return usernames
 
 if __name__ == "__main__":
