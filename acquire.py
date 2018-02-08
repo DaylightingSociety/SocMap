@@ -25,6 +25,9 @@ def limit_handled(cursor):
 			yield cursor.next()
 		except tweepy.RateLimitError:
 			time.sleep(15 * 60)
+		except tweepy.error.TweepError:
+			# TODO: Add logging for this case to explain more
+			raise StopIteration # No more data we can read
 
 # Returns whether we have tweets from a particular user stored
 def userTweetsPresent(username, tweetdir):
@@ -86,17 +89,37 @@ def saveUserList(workdir, name, dictionary):
 	f.write(blob)
 	f.close()
 
+def loadUserList(workdir, name):
+	f = open(workdir + "/" + name + ".json", "r")
+	blob = f.read()
+	f.close()
+	return json.loads(blob)
+
+def flattenUserDictionary(links):
+	res = set()
+	for username in links.keys():
+		for linkedTo in links[username]:
+			res.add(linkedTo)
+	return res
+
 def getLayers(api, numLayers, options, userlist):
-	nextLayerRTs = dict()
-	nextLayerMentions = dict()
-	for username in userlist:
-		if( not userTweetsPresent(username, options.tweetdir) ):
-			getUserTweets(api, username, options.tweetdir, options.numtweets)
-			mentions, rts = getUserReferences(username, options.tweetdir, options.workdir)
-			if( len(rts) > 0 ):
-				nextLayerRTs[username] = list(rts)
-			if( len(mentions) > 0 ):
-				nextLayerMentions[username] = list(mentions)
-	saveUserList(options.workdir, "layer0mentionedUsers", nextLayerMentions)
-	saveUserList(options.workdir, "layer0retweetedUsers", nextLayerRTs)
-	analyze.saveNetwork(options.mapdir, 0, userlist, nextLayerRTs, nextLayerMentions)
+	for layer in range(0, numLayers):
+		if( layer > 0 ):
+			oldRTs = loadUserList(options.workdir, "layer" + str(layer-1) + "retweetedUsers")
+			oldMentions = loadUserList(options.workdir, "layer" + str(layer-1) + "mentionedUsers")
+			rtUsernames = flattenUserDictionary(oldRTs)
+			mentionUsernames = flattenUserDictionary(oldMentions)
+			userlist = list(rtUsernames.union(mentionUsernames))
+		nextLayerRTs = dict()
+		nextLayerMentions = dict()
+		for username in userlist:
+			if( not userTweetsPresent(username, options.tweetdir) ):
+				getUserTweets(api, username, options.tweetdir, options.numtweets)
+				mentions, rts = getUserReferences(username, options.tweetdir, options.workdir)
+				if( len(rts) > 0 ):
+					nextLayerRTs[username] = list(rts)
+				if( len(mentions) > 0 ):
+					nextLayerMentions[username] = list(mentions)
+		saveUserList(options.workdir, "layer" + str(layer) + "mentionedUsers", nextLayerMentions)
+		saveUserList(options.workdir, "layer" + str(layer) + "retweetedUsers", nextLayerRTs)
+		analyze.saveNetwork(options.mapdir, layer, userlist, nextLayerRTs, nextLayerMentions)

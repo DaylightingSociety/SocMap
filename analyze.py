@@ -17,6 +17,7 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 	net = None
 	oldMapFilename = None
 	newMapFilename = mapDir + "/layer" + str(layer+1) + ".gml"
+	newMapFilenameCytoscape = mapDir + "/layer" + str(layer+1) + "_cytoscape.gml"
 	if( layer > 0 ):
 		oldMapFilename = mapDir + "/layer" + str(layer) + ".gml"
 
@@ -26,7 +27,7 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 		for username in baseUsers:
 			net.add_node(username, name=username, layer=0, retweeted="false", mentioned="false")
 	else:
-		raise Exception("Not implemented yet!")
+		net = nx.read_gml(oldMapFilename)
 
 	# Now let's add the new users
 	# This is messy, because we have to add all of the users *and* their
@@ -72,4 +73,5 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 
 	# Finally save it to disk
 	nx.write_gml(net, newMapFilename)
-	patchGML(newMapFilename)
+	nx.write_gml(net, newMapFilenameCytoscape)
+	patchGML(newMapFilenameCytoscape)
