@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 # Dependencies
-import tweepy, os, jsonpickle, re
+import tweepy, os, jsonpickle, re, json
+import analyze
 
 class Tweet(object):
 	def __init__(self, user, text, timestamp, mentions):
@@ -79,6 +80,12 @@ def getUserReferences(username, tweetdir, workdir):
 def deleteUserTweets(username, tweetdir):
 	os.unlink(tweetdir + "/" + username + ".json")
 
+def saveUserList(workdir, name, dictionary):
+	blob = json.dumps(dictionary)
+	f = open(workdir + "/" + name + ".json", "w")
+	f.write(blob)
+	f.close()
+
 def getLayers(api, numLayers, options, userlist):
 	nextLayerRTs = dict()
 	nextLayerMentions = dict()
@@ -90,5 +97,6 @@ def getLayers(api, numLayers, options, userlist):
 				nextLayerRTs[username] = list(rts)
 			if( len(mentions) > 0 ):
 				nextLayerMentions[username] = list(mentions)
-	print("Next layer retweets: ", nextLayerRTs)
-	print("Next layer mentions: ", nextLayerMentions)
+	saveUserList(options.workdir, "layer0mentionedUsers", nextLayerMentions)
+	saveUserList(options.workdir, "layer0retweetedUsers", nextLayerRTs)
+	analyze.saveNetwork(options.mapdir, 0, userlist, nextLayerRTs, nextLayerMentions)
