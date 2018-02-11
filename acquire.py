@@ -28,6 +28,7 @@ def limit_handled(api, cursor):
 			remaining = int(response.headers['x-rate-limit-remaining'])
 			if( remaining == 0 ):
 				reset = int(response.headers['x-rate-limit-reset'])
+				reset = datetime.fromtimestamp(reset)
 				delay = (reset - datetime.datetime.now()).total_seconds + 10 # 10 second buffer
 				print("Rate limited, sleeping ", str(delay), " seconds")
 				time.sleep(delay)
