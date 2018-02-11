@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Dependencies
-import tweepy, os, jsonpickle, re, json
+import tweepy, os, jsonpickle, re, json, datetime, time
 import analyze
 
 class Tweet(object):
@@ -19,13 +19,20 @@ class Retweet(Tweet):
 
 # When you hit the Twitter API for too long it blocks for 15 minutes
 # we'll just wait around for that.
-def limit_handled(cursor):
+def limit_handled(api, cursor):
 	while True:
 		try:
 			yield cursor.next()
 		except tweepy.error.TweepError as e:
-			print("Exception during data collection: ", e)
-			raise StopIteration # No more data we can read
+			remaining = int(api.last_response.getheader('x-rate-limit-remaining'))
+			if( remaining == 0 ):
+				reset = int(api.last_response.getheader('x-rate-limit-reset'))
+				delay = (reset - datetime.now()).total_seconds + 10 # 10 second buffer
+				print("Rate limited, sleeping ", str(delay), " seconds")
+				time.sleep(delay)
+			else:
+				print("Exception during data collection: ", e)
+				raise StopIteration # No more data we can read
 
 # Returns whether we have tweets from a particular user stored
 def userTweetsPresent(username, tweetdir):
@@ -42,9 +49,9 @@ def getMentionsFromText(text):
 
 # Downloads, parses, and saves tweets for a user
 def getUserTweets(api, username, tweetdir, numtweets):
-	cursor = tweepy.Cursor(api.user_timeline, screen_name=username, count=numtweets, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+	cursor = tweepy.Cursor(api.user_timeline, screen_name=username, count=numtweets)
 	tweets = []
-	for tweet in limit_handled(cursor.items()):
+	for tweet in limit_handled(api, cursor.items()):
 		mentions = getMentionsFromText(tweet.text)
 		date = tweet.created_at
 		text = tweet.text
