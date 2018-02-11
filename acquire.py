@@ -24,9 +24,11 @@ def limit_handled(cursor):
 		try:
 			yield cursor.next()
 		except tweepy.RateLimitError:
+			print("Rate limited. Pausing for 15 minutes...")
 			time.sleep(15 * 60)
-		except tweepy.error.TweepError:
+		except tweepy.error.TweepError as e:
 			# TODO: Add logging for this case to explain more
+			print("Exception during data collection: ", e)
 			raise StopIteration # No more data we can read
 
 # Returns whether we have tweets from a particular user stored
@@ -44,7 +46,7 @@ def getMentionsFromText(text):
 
 # Downloads, parses, and saves tweets for a user
 def getUserTweets(api, username, tweetdir, numtweets):
-	cursor = tweepy.Cursor(api.user_timeline, user_id=username, count=numtweets)
+	cursor = tweepy.Cursor(api.user_timeline, screen_name=username, count=numtweets)
 	tweets = []
 	for tweet in limit_handled(cursor.items()):
 		mentions = getMentionsFromText(tweet.text)
