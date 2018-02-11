@@ -24,9 +24,10 @@ def limit_handled(api, cursor):
 		try:
 			yield cursor.next()
 		except tweepy.error.TweepError as e:
-			remaining = int(api.last_response.getheader('x-rate-limit-remaining'))
+			response = api.last_response
+			remaining = int(response.headers['x-rate-limit-remaining'])
 			if( remaining == 0 ):
-				reset = int(api.last_response.getheader('x-rate-limit-reset'))
+				reset = int(response.headers['x-rate-limit-reset'])
 				delay = (reset - datetime.now()).total_seconds + 10 # 10 second buffer
 				print("Rate limited, sleeping ", str(delay), " seconds")
 				time.sleep(delay)
