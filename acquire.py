@@ -2,7 +2,7 @@
 
 # Dependencies
 import tweepy, os, jsonpickle, re, json, datetime, time, gzip
-import analyze
+import analyze, log
 
 class Tweet(object):
 	def __init__(self, user, text, timestamp, mentions):
@@ -26,23 +26,23 @@ def limit_handled(api, cursor):
 		except tweepy.error.TweepError as e:
 			response = api.last_response
 			if( response.status_code >= 500 ):
-				print("Error on Twitter's end during data collection:", e)
+				log.log(log.warn, "Error on Twitter's end during data collection: " + e)
 				raise StopIteration
 			if( response.status_code == 404 ):
-				print("Exception during data collection: User does not exist")
+				log.log(log.debug, "Exception during data collection: User does not exist")
 				raise StopIteration
 			elif( response.status_code == 401 ):
-				print("Exception during data collection: User account is set to private")
+				log.log(log.debug, "Exception during data collection: User account is set to private")
 				raise StopIteration
 			remaining = int(response.headers['x-rate-limit-remaining'])
 			if( remaining == 0 ):
 				reset = int(response.headers['x-rate-limit-reset'])
 				reset = datetime.datetime.fromtimestamp(reset)
 				delay = (reset - datetime.datetime.now()).total_seconds() + 10 # 10 second buffer
-				print("Rate limited, sleeping ", str(delay), " seconds")
+				log.log(log.info, "Rate limited, sleeping "+str(delay)+" seconds")
 				time.sleep(delay)
 			else:
-				print("Exception during data collection:", e)
+				log.log(log.warn, "Exception during data collection: " + e)
 				raise StopIteration # No more data we can read
 
 # Returns whether we have tweets from a particular user stored
@@ -141,6 +141,7 @@ def flattenUserDictionary(links):
 
 def getLayers(api, numLayers, options, userlist):
 	for layer in range(0, numLayers):
+		log.log(log.info, "Beginning data collection for layer " + str(layer))
 		if( layer > 0 ):
 			oldRTs = loadUserList(options.workdir, "layer" + str(layer-1) + "retweetedUsers")
 			oldMentions = loadUserList(options.workdir, "layer" + str(layer-1) + "mentionedUsers")
@@ -157,6 +158,8 @@ def getLayers(api, numLayers, options, userlist):
 					nextLayerRTs[username] = list(rts)
 				if( len(mentions) > 0 ):
 					nextLayerMentions[username] = list(mentions)
+		log.log(log.info, "Layer " + str(layer) + " data collection complete, saving user lists...")
 		saveUserList(options.workdir, "layer" + str(layer) + "mentionedUsers", nextLayerMentions)
 		saveUserList(options.workdir, "layer" + str(layer) + "retweetedUsers", nextLayerRTs)
+		log.log(log.info, "Saving network to disk...")
 		analyze.saveNetwork(options.mapdir, layer, userlist, nextLayerRTs, nextLayerMentions)

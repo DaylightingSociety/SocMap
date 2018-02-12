@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 # Dependencies
-import argparse, sys, signal, os
+import argparse, sys, signal, os, threading
 import tweepy
 
 # Local imports
-import acquire
+import acquire, log
 
 # Signal handler for Control-C
 def sigExit(signal, frame):
@@ -52,6 +52,12 @@ def parseOptions():
 	parser.add_argument("-u", "--userlist", metavar="<file>", required=True,
 	                    action="store", type=str, dest="userlist", 
 	                    help="File containing list of starting usernames")
+	parser.add_argument("-L", "--logfile", metavar="<file>", default=None,
+	                    action="store", type=str, dest="logfile",
+	                    help="Where to store log data relative to workdir (detault stdout)")
+	parser.add_argument("-d", "--debug", default=False,
+	                    action="store_true", dest="debug",
+	                    help="Enable debug-level logging")
 	options = parser.parse_args()
 	return options
 
@@ -86,10 +92,15 @@ def createDirectories(options):
 			print("WARNING: Directory '" + d + "' does not exist - creating...")
 			os.mkdir(d)
 
+def startLogging(workdir, logfile, debug):
+	logger = threading.Thread(target=log.logHandler, args=(workdir, logfile, debug))
+	logger.daemon = True
+	logger.start()
+
 if __name__ == "__main__":
 	options = parseOptions()
 	createDirectories(options)
 	api = loadKeys(options.authfile)
 	layer0 = getUsernames(options.userlist)
+	startLogging(options.workdir, options.logfile, options.debug)
 	acquire.getLayers(api, options.layers, options, layer0)
-	#signal.signal(signal.SIGINT, sigExit)
