@@ -25,15 +25,24 @@ def limit_handled(api, cursor):
 			yield cursor.next()
 		except tweepy.error.TweepError as e:
 			response = api.last_response
+			if( response.status_code >= 500 ):
+				print("Error on Twitter's end during data collection:", e)
+				raise StopIteration
+			if( response.status_code == 404 ):
+				print("Exception during data collection: User does not exist")
+				raise StopIteration
+			elif( response.status_code == 401 ):
+				print("Exception during data collection: User account is set to private")
+				raise StopIteration
 			remaining = int(response.headers['x-rate-limit-remaining'])
 			if( remaining == 0 ):
 				reset = int(response.headers['x-rate-limit-reset'])
-				reset = datetime.fromtimestamp(reset)
-				delay = (reset - datetime.datetime.now()).total_seconds + 10 # 10 second buffer
+				reset = datetime.datetime.fromtimestamp(reset)
+				delay = (reset - datetime.datetime.now()).total_seconds() + 10 # 10 second buffer
 				print("Rate limited, sleeping ", str(delay), " seconds")
 				time.sleep(delay)
 			else:
-				print("Exception during data collection: ", e)
+				print("Exception during data collection:", e)
 				raise StopIteration # No more data we can read
 
 # Returns whether we have tweets from a particular user stored
