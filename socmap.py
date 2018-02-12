@@ -79,8 +79,16 @@ def getUsernames(filename):
 		usernames.append(line.rstrip().lower())
 	return usernames
 
+# Make sure the directories we need exist before we try to save files
+def createDirectories(options):
+	for d in [options.tweetdir, options.mapdir, options.workdir]:
+		if( not os.path.isdir(d) ):
+			print("WARNING: Directory '" + d + "' does not exist - creating...")
+			os.mkdir(d)
+
 if __name__ == "__main__":
 	options = parseOptions()
+	createDirectories(options)
 	api = loadKeys(options.authfile)
 	layer0 = getUsernames(options.userlist)
 	acquire.getLayers(api, options.layers, options, layer0)
