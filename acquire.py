@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Dependencies
-import tweepy, os, jsonpickle, re, json, datetime, time
+import tweepy, os, jsonpickle, re, json, datetime, time, gzip
 import analyze
 
 class Tweet(object):
@@ -46,8 +46,35 @@ def limit_handled(api, cursor):
 				raise StopIteration # No more data we can read
 
 # Returns whether we have tweets from a particular user stored
-def userTweetsPresent(username, tweetdir):
-	return os.path.isfile(tweetdir + "/" + username + ".json")
+def userTweetsPresent(username, tweetdir, compression):
+	if( compression ):
+		return os.path.isfile(tweetdir + "/" + username + ".json.gz")
+	else:
+		return os.path.isfile(tweetdir + "/" + username + ".json")
+
+# Saves a tweet blob as JSON, with optional GZIP compression
+def saveTweetsToFile(username, tweets, tweetdir, compression):
+	tweetDump = jsonpickle.encode(tweets)
+	if( compression ):
+		f = gzip.open(tweetdir + "/" + username + ".json.gz", "wb")
+		tweetDump = bytearray(tweetDump, "utf-8")
+	else:
+		f = open(tweetdir + "/" + username + ".json", "w")
+	f.write(tweetDump)
+	f.close()
+
+# Read tweets back from file, with optional GZIP compression
+def loadTweetsFromFile(username, tweetdir, compression):
+	if( compression ):
+		f = gzip.open(tweetdir + "/" + username + ".json.gz", "rb")
+		blob = f.read()
+		f.close()
+		return jsonpickle.decode(blob.decode())
+	else:
+		f = open(tweetdir + "/" + username + ".json", "r")
+		blob = f.read()
+		f.close()
+		return jsonpickle.decode(blob)
 
 # Returns the usernames of people mentioned in a body of text
 def getMentionsFromText(text):
@@ -59,7 +86,7 @@ def getMentionsFromText(text):
 	return list(usernames)
 
 # Downloads, parses, and saves tweets for a user
-def getUserTweets(api, username, tweetdir, numtweets):
+def getUserTweets(api, username, tweetdir, numtweets, compression):
 	cursor = tweepy.Cursor(api.user_timeline, screen_name=username, count=numtweets)
 	tweets = []
 	for tweet in limit_handled(api, cursor.items()):
@@ -75,17 +102,11 @@ def getUserTweets(api, username, tweetdir, numtweets):
 		else:
 			tw = Tweet(source, text, date, mentions)
 			tweets.append(tw)
-	tweetDump = jsonpickle.encode(tweets)
-	f = open(tweetdir + "/" + username + ".json", "w")
-	f.write(tweetDump)
-	f.close()
+	saveTweetsToFile(username, tweets, tweetdir, compression)
 
 # Parse user tweets, return [[people they mentioned], [people they retweeted]]
-def getUserReferences(username, tweetdir, workdir):
-	tweetfile = open(tweetdir + "/" + username + ".json", "r")
-	blob = tweetfile.read()
-	tweets = jsonpickle.decode(blob)
-	tweetfile.close()
+def getUserReferences(username, tweetdir, workdir, compression):
+	tweets = loadTweetsFromFile(username, tweetdir, compression)
 	retweeted = set()
 	mentioned = set()
 	for tweet in tweets:
@@ -129,9 +150,9 @@ def getLayers(api, numLayers, options, userlist):
 		nextLayerRTs = dict()
 		nextLayerMentions = dict()
 		for username in userlist:
-			if( not userTweetsPresent(username, options.tweetdir) ):
-				getUserTweets(api, username, options.tweetdir, options.numtweets)
-				mentions, rts = getUserReferences(username, options.tweetdir, options.workdir)
+			if( not userTweetsPresent(username, options.tweetdir, options.compress) ):
+				getUserTweets(api, username, options.tweetdir, options.numtweets, options.compress)
+				mentions, rts = getUserReferences(username, options.tweetdir, options.workdir, options.compress)
 				if( len(rts) > 0 ):
 					nextLayerRTs[username] = list(rts)
 				if( len(mentions) > 0 ):

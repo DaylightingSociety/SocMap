@@ -29,7 +29,7 @@ def parseOptions():
 	                    action="store_true", dest="removetweets", 
 	                    help="Remove tweets after extracting metadata")
 	parser.add_argument("-c", "--compress", default=False,
-	                    action="store_true", dest="removetweets", 
+	                    action="store_true", dest="compress", 
 	                    help="Compress downloaded tweets with GZIP")
 	parser.add_argument("-l", "--layers", default=3,
 	                    action="store", type=int, dest="layers", 
