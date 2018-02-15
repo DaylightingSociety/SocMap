@@ -26,7 +26,7 @@ def limit_handled(api, cursor):
 		except tweepy.error.TweepError as e:
 			response = api.last_response
 			if( response.status_code >= 500 ):
-				log.log(log.warn, "Error on Twitter's end during data collection: " + e)
+				log.log(log.warn, "Error on Twitter's end during data collection: " + str(e))
 				raise StopIteration
 			if( response.status_code == 404 ):
 				log.log(log.debug, "Exception during data collection: User does not exist")
@@ -42,7 +42,7 @@ def limit_handled(api, cursor):
 				log.log(log.info, "Rate limited, sleeping "+str(delay)+" seconds")
 				time.sleep(delay)
 			else:
-				log.log(log.warn, "Exception during data collection: " + e)
+				log.log(log.warn, "Exception during data collection: " + str(e))
 				raise StopIteration # No more data we can read
 
 # Returns whether we have tweets from a particular user stored
