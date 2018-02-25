@@ -21,9 +21,7 @@ if __name__ == "__main__":
 	remainingUsers = []
 	remainingEdges = []
 
-	nodes = orig.nodes(data=True)
-	for i in range(0, len(nodes)):
-		user = nodes[i]
+	for user in orig.nodes(data=True)
 		name = user[1]["name"]
 		layer = user[1]["layer"]
 		degree = orig.in_degree(name)
