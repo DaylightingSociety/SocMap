@@ -46,11 +46,11 @@ def limit_handled(api, cursor):
 				raise StopIteration # No more data we can read
 
 # Returns whether we have tweets from a particular user stored
-def userTweetsPresent(username, tweetdir, compression):
-	if( compression ):
-		return os.path.isfile(tweetdir + "/" + username + ".json.gz")
-	else:
-		return os.path.isfile(tweetdir + "/" + username + ".json")
+# Detects compressed and plain JSON files
+def userTweetsPresent(username, tweetdir):
+	cFile = os.path.isfile(tweetdir + "/" + username + ".json.gz")
+	pFile = os.path.isfile(tweetdir + "/" + username + ".json")
+	return cFile or pFile
 
 # Saves a tweet blob as JSON, with optional GZIP compression
 def saveTweetsToFile(username, tweets, tweetdir, compression):
@@ -63,15 +63,20 @@ def saveTweetsToFile(username, tweets, tweetdir, compression):
 	f.write(tweetDump)
 	f.close()
 
-# Read tweets back from file, with optional GZIP compression
-def loadTweetsFromFile(username, tweetdir, compression):
-	if( compression ):
-		f = gzip.open(tweetdir + "/" + username + ".json.gz", "rb")
+# Read tweets back from file
+# Loads compressed file if available, falls back to plaintext otherwise
+def loadTweetsFromFile(username, tweetdir):
+	pFilename = tweetdir + "/" + username + ".json"
+	cFilename = pFilename + ".gz"
+	cFile = os.path.isfile(cFilename)
+	pFile = os.path.isfile(pFilename)
+	if( cFile ):
+		f = gzip.open(cFilename, "rb")
 		blob = f.read()
 		f.close()
 		return jsonpickle.decode(blob.decode())
 	else:
-		f = open(tweetdir + "/" + username + ".json", "r")
+		f = open(pFilename, "r")
 		blob = f.read()
 		f.close()
 		return jsonpickle.decode(blob)
@@ -105,8 +110,8 @@ def getUserTweets(api, username, tweetdir, numtweets, compression):
 	saveTweetsToFile(username, tweets, tweetdir, compression)
 
 # Parse user tweets, return [[people they mentioned], [people they retweeted]]
-def getUserReferences(username, tweetdir, workdir, compression):
-	tweets = loadTweetsFromFile(username, tweetdir, compression)
+def getUserReferences(username, tweetdir):
+	tweets = loadTweetsFromFile(username, tweetdir)
 	retweeted = set()
 	mentioned = set()
 	for tweet in tweets:
@@ -139,7 +144,7 @@ def flattenUserDictionary(links):
 			res.add(linkedTo)
 	return res
 
-def getLayers(api, numLayers, options, userlist):
+def getLayers(api, numLayers, options, userlist, olduserlist=[]):
 	for layer in range(0, numLayers):
 		log.log(log.info, "Beginning data collection for layer " + str(layer))
 		if( layer > 0 ):
@@ -148,12 +153,13 @@ def getLayers(api, numLayers, options, userlist):
 			rtUsernames = flattenUserDictionary(oldRTs)
 			mentionUsernames = flattenUserDictionary(oldMentions)
 			userlist = list(rtUsernames.union(mentionUsernames))
+		saveUserList(options.workdir, "layer" + str(layer) + "startingUsers", set(userlist))
 		nextLayerRTs = dict()
 		nextLayerMentions = dict()
 		for username in userlist:
-			if( not userTweetsPresent(username, options.tweetdir, options.compress) ):
+			if( not userTweetsPresent(username, options.tweetdir) ):
 				getUserTweets(api, username, options.tweetdir, options.numtweets, options.compress)
-				mentions, rts = getUserReferences(username, options.tweetdir, options.workdir, options.compress)
+				mentions, rts = getUserReferences(username, options.tweetdir)
 				if( len(rts) > 0 ):
 					nextLayerRTs[username] = list(rts)
 				if( len(mentions) > 0 ):
