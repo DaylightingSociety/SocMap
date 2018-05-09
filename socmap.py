@@ -25,9 +25,6 @@ def parseOptions():
 	descr = "A Framework for Social-Network Mapping"
 	currentdir = os.path.dirname(os.path.realpath(__file__))
 	parser = Parser(description=descr)
-	parser.add_argument("-r", "--removetweets", default=False,
-	                    action="store_true", dest="removetweets", 
-	                    help="Remove tweets after extracting metadata")
 	parser.add_argument("-c", "--compress", default=False,
 	                    action="store_true", dest="compress", 
 	                    help="Compress downloaded tweets with GZIP")
