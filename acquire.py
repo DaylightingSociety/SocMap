@@ -153,7 +153,6 @@ def getLayers(api, numLayers, options, userlist, olduserlist=[]):
 			rtUsernames = flattenUserDictionary(oldRTs)
 			mentionUsernames = flattenUserDictionary(oldMentions)
 			userlist = list(rtUsernames.union(mentionUsernames))
-		saveUserList(options.workdir, "layer" + str(layer) + "startingUsers", set(userlist))
 		nextLayerRTs = dict()
 		nextLayerMentions = dict()
 		for username in userlist:
