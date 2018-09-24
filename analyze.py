@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import networkx as nx
+from graph_tool.all import *
 import re
 
 # NetworkX produces GML files that include a numeric 'label' attribute.
@@ -22,9 +22,17 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 		oldMapFilename = mapDir + "/layer" + str(layer) + ".gml"
 
 	# For layer 0 we need to explicitly create seed nodes
+	users = dict()
+	u_name = g.new_vertex_property("string")
+	u_layer = g.new_vertex_property("int")
+	u_retweeted = g.new_vertex_property("bool")
 	if( layer == 0 ):
-		net = nx.DiGraph()
+		net = Graph()
 		for username in baseUsers:
+			users[user]
+
+# ENDED HERE, NEED TO GIVE ATTRIBUTES TO EACH USER
+
 			net.add_node(username, name=username, layer=0, retweeted="false", mentioned="false")
 	else:
 		net = nx.read_gml(oldMapFilename)
