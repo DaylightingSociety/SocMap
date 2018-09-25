@@ -27,13 +27,13 @@ def limit_handled(api, cursor):
 			response = api.last_response
 			if( response.status_code >= 500 ):
 				log.log(log.warn, "Error on Twitter's end during data collection: " + str(e))
-				raise StopIteration
+				return
 			if( response.status_code == 404 ):
 				log.log(log.debug, "Exception during data collection: User does not exist")
-				raise StopIteration
+				return
 			elif( response.status_code == 401 ):
 				log.log(log.debug, "Exception during data collection: User account is set to private")
-				raise StopIteration
+				return
 			remaining = int(response.headers['x-rate-limit-remaining'])
 			if( remaining == 0 ):
 				reset = int(response.headers['x-rate-limit-reset'])
@@ -43,7 +43,10 @@ def limit_handled(api, cursor):
 				time.sleep(delay)
 			else:
 				log.log(log.warn, "Exception during data collection: " + str(e))
-				raise StopIteration # No more data we can read
+				return
+		# Tweepy still raises StopIteration, which is no longer Pythonic in 3.7
+		except StopIteration:
+			return
 
 # Returns whether we have tweets from a particular user stored
 # Detects compressed and plain JSON files
