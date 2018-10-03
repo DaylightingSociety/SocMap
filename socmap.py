@@ -28,6 +28,15 @@ def parseOptions():
 	parser.add_argument("-c", "--compress", default=False,
 	                    action="store_true", dest="compress", 
 	                    help="Compress downloaded tweets with GZIP")
+	parser.add_argument("-f", "--following", default=False,
+	                    action="store_true", dest="following", 
+	                    help="Graph tree from who seeds are following")
+	parser.add_argument("-F", "--followers", default=False,
+	                    action="store_true", dest="followers", 
+	                    help="Graph tree from who is following seeds")
+	parser.add_argument("-N", "--notweets", default=False,
+	                    action="store_true", dest="notweets", 
+	                    help="Do not graph retweets or mentions")
 	parser.add_argument("-l", "--layers", default=3,
 	                    action="store", type=int, dest="layers", 
 	                    help="How many layers out to download")
@@ -100,4 +109,12 @@ if __name__ == "__main__":
 	api = loadKeys(options.authfile)
 	layer0 = getUsernames(options.userlist)
 	startLogging(options.workdir, options.logfile, options.debug)
-	acquire.getLayers(api, options.layers, options, layer0)
+	if( not options.notweets ):
+		acquire.getLayers(api, options.layers, options, layer0)
+	if( options.following ):
+		acquire.getFollowing(api, options.layers, options, layer0)
+	if( options.followers ):
+		acquire.getFollowers(api, options.layers, options, layer0)
+	if( options.notweets and options.following == False and options.followers == False ):
+		sys.stderr.write("ERROR: Cannot specify --notweets without specifying --following or --followers\n")
+		sys.exit(1)

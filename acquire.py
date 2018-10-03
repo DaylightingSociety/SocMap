@@ -27,13 +27,13 @@ def limit_handled(api, cursor):
 			response = api.last_response
 			if( response.status_code >= 500 ):
 				log.log(log.warn, "Error on Twitter's end during data collection: " + str(e))
-				return
+				continue
 			if( response.status_code == 404 ):
 				log.log(log.debug, "Exception during data collection: User does not exist")
-				return
+				continue
 			elif( response.status_code == 401 ):
 				log.log(log.debug, "Exception during data collection: User account is set to private")
-				return
+				continue
 			remaining = int(response.headers['x-rate-limit-remaining'])
 			if( remaining == 0 ):
 				reset = int(response.headers['x-rate-limit-reset'])
@@ -43,7 +43,7 @@ def limit_handled(api, cursor):
 				time.sleep(delay)
 			else:
 				log.log(log.warn, "Exception during data collection: " + str(e))
-				return
+				continue
 		# Tweepy still raises StopIteration, which is no longer Pythonic in 3.7
 		except StopIteration:
 			return
@@ -92,6 +92,24 @@ def getMentionsFromText(text):
 	for username in res:
 		usernames.add(username[1:].lower())
 	return list(usernames)
+
+# Returns the usernames an account is following
+def getUserFollowing(api, username):
+	usernames = []
+	cursor = tweepy.Cursor(api.friends_ids, screen_name=username)
+	for accountID in limit_handled(api, cursor.items()):
+		u = api.get_user(accountID)
+		usernames.append(u.screen_name)
+	return usernames
+
+# Returns the usernames of who is following this account
+def getUserFollowers(api, username):
+	usernames = []
+	cursor = tweepy.Cursor(api.followers_ids, screen_name=username)
+	for accountID in limit_handled(api, cursor.items()):
+		u = api.get_user(accountID)
+		usernames.append(u.screen_name)
+	return usernames
 
 # Downloads, parses, and saves tweets for a user
 def getUserTweets(api, username, tweetdir, numtweets, compression):
@@ -147,9 +165,14 @@ def flattenUserDictionary(links):
 			res.add(linkedTo)
 	return res
 
+# Builds two related graphs at once:
+# One of retweets (seed retweets A, A retweets B, etc)
+# One of mentions (seed mentioned A, A mentioned B, etc)
+# We save off each layer as a dictionary of which users retweeted/mentioned
+# which other users, and also export each layer as a complex graph network
 def getLayers(api, numLayers, options, userlist, olduserlist=[]):
 	for layer in range(0, numLayers):
-		log.log(log.info, "Beginning data collection for layer " + str(layer))
+		log.log(log.info, "Beginning 'tweet' data collection for layer " + str(layer))
 		if( layer > 0 ):
 			oldRTs = loadUserList(options.workdir, "layer" + str(layer-1) + "retweetedUsers")
 			oldMentions = loadUserList(options.workdir, "layer" + str(layer-1) + "mentionedUsers")
@@ -166,8 +189,51 @@ def getLayers(api, numLayers, options, userlist, olduserlist=[]):
 					nextLayerRTs[username] = list(rts)
 				if( len(mentions) > 0 ):
 					nextLayerMentions[username] = list(mentions)
-		log.log(log.info, "Layer " + str(layer) + " data collection complete, saving user lists...")
+		log.log(log.info, "Layer " + str(layer) + " 'tweet' data collection complete, saving user lists...")
 		saveUserList(options.workdir, "layer" + str(layer) + "mentionedUsers", nextLayerMentions)
 		saveUserList(options.workdir, "layer" + str(layer) + "retweetedUsers", nextLayerRTs)
 		log.log(log.info, "Saving network to disk...")
-		analyze.saveNetwork(options.mapdir, layer, userlist, nextLayerRTs, nextLayerMentions)
+		analyze.saveTweetNetwork(options.mapdir, layer, userlist, nextLayerRTs, nextLayerMentions)
+
+# Graph a tree starting with seeds, arrows to who they're following,
+# arrows to who *they're* following, etc
+# Simpler than retweets and mentions, but may yield interesting results
+def getFollowing(api, numLayers, options, userlist, olduserlist=[]):
+	for layer in range(0, numLayers):
+		log.log(log.info, "Beginning 'following' data collection for layer " + str(layer))
+		if( layer > 0 ):
+				oldFollowing = loadUserList(options.workdir, "layer" + str(layer-1) + "followingUsers")
+				userlist = list(flattenUserDictionary(oldFollowing))
+		nextLayerFollowing = dict()
+		for username in userlist:
+			following = getUserFollowing(api, username)
+			if( len(following) > 0 ):
+				nextLayerFollowing[username] = list(following)
+		log.log(log.info, "Layer " + str(layer) + " 'following' data collection complete, saving user lists...")
+		saveUserList(options.workdir, "layer" + str(layer) + "followingUsers", nextLayerFollowing)
+		log.log(log.info, "Saving network to disk...")
+		analyze.saveSimpleNetwork(options.mapdir, layer, userlist, nextLayerFollowing, "following")
+
+# Graph a tree starting with seeds, arrows to who's following them,
+# arrows to who's following *them*, etc
+# Simpler than retweets and mentions, but may yield interesting results
+#
+# TODO: Would it make sense to invert the arrows on this graph so
+# directionality matches getFollowing?
+def getFollowers(api, numLayers, options, userlist, olduserlist=[]):
+	for layer in range(0, numLayers):
+		log.log(log.info, "Beginning 'followers' data collection for layer " + str(layer))
+		if( layer > 0 ):
+				oldFollowers = loadUserList(options.workdir, "layer" + str(layer-1) + "followerUsers")
+				userlist = list(flattenUserDictionary(oldFollowers))
+		nextLayerFollowers = dict()
+		for username in userlist:
+			following = getUserFollowers(api, username)
+			if( len(following) > 0 ):
+				nextLayerFollowing[username] = list(following)
+		log.log(log.info, "Layer " + str(layer) + " 'followers' data collection complete, saving user lists...")
+		saveUserList(options.workdir, "layer" + str(layer) + "followerUsers", nextLayerFollowing)
+		log.log(log.info, "Saving network to disk...")
+		analyze.saveSimpleNetwork(options.mapdir, layer, userlist, nextLayerFollowing, "followers")
+
+
