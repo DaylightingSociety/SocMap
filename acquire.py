@@ -40,6 +40,8 @@ def limit_handled(api, cursor):
 				reset = datetime.datetime.fromtimestamp(reset)
 				delay = (reset - datetime.datetime.now()).total_seconds() + 10 # 10 second buffer
 				log.log(log.info, "Rate limited, sleeping "+str(delay)+" seconds")
+				if( delay == None or delay <= 0 ):
+					delay = 0
 				time.sleep(delay)
 			else:
 				log.log(log.warn, "Exception during data collection: " + str(e))
