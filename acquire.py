@@ -147,7 +147,7 @@ def flattenUserDictionary(links):
 			res.add(linkedTo)
 	return res
 
-def getLayers(api, numLayers, options, userlist, olduserlist=[]):
+def getLayers(api, numLayers, options, userlist, olduserlist=set()):
 	for layer in range(0, numLayers):
 		log.log(log.info, "Beginning data collection for layer " + str(layer))
 		if( layer > 0 ):
@@ -161,6 +161,8 @@ def getLayers(api, numLayers, options, userlist, olduserlist=[]):
 		for username in userlist:
 			if( not userTweetsPresent(username, options.tweetdir) ):
 				getUserTweets(api, username, options.tweetdir, options.numtweets, options.compress)
+			if( not username in olduserlist ):
+				olduserlist.add(username)
 				mentions, rts = getUserReferences(username, options.tweetdir)
 				if( len(rts) > 0 ):
 					nextLayerRTs[username] = list(rts)

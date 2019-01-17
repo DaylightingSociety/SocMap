@@ -10,6 +10,7 @@ except ImportError:
 except ImportError:
 	sys.stderr.write("ERROR: Module requires either igraph (preferred) or networkx (slower)")
 	sys.exit(1)
+import log
 
 # NetworkX produces GML files that include a numeric 'label' attribute.
 # This attribute prevents Cytoscape from opening the files, so we'll patch it.
@@ -38,6 +39,8 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 			for i in range(0, len(baseUsers)):
 				username = baseUsers[i]
 				net.vs[i]["name"] = username
+				# NetworkX won't read our GML files unless we include a "label"
+				net.vs[i]["label"] = username
 				net.vs[i]["layer"] = 0
 				net.vs[i]["retweeted"] = "false"
 				net.vs[i]["mentioned"] = "false"
@@ -47,7 +50,15 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				net.add_node(username, name=username, layer=0, retweeted="false", mentioned="false")
 	else:
 		if( has_igraph ):
+			# When igraph writes to GML, it saves the ids as floats
+			# When it reads this data back in, it creates an extra "id"
+			# attribute. If we then add vertices and write to GML again,
+			# some vertices will have an "id" attribute and some won't,
+			# and igraph will become *very* confused
 			net = ig.Graph.Read_GML(oldMapFilename)
+			for i in range(0, len(net.vs)):
+				if( "id" in net.vs[i].attribute_names() ):
+					del net.vs[i]["id"]
 		else:
 			net = nx.read_gml(oldMapFilename)
 
@@ -74,12 +85,13 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 	# Now add those usernames with appropriate retweeted/mentioned attributes
 	for username in mentionedUsernames:
 		if( username in nodeNames ):
-			next
+			continue
 		if( username in retweetedUsernames ):
 			if( has_igraph ):
-				net.add_vertices(1)
-				i = len(net.vs)-1
+				net.add_vertex(username)
+				i = net.vs.find(username).index
 				net.vs[i]["name"] = username
+				net.vs[i]["label"] = username
 				net.vs[i]["layer"] = layer+1
 				net.vs[i]["retweeted"] = "true"
 				net.vs[i]["mentioned"] = "true"
@@ -87,9 +99,10 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				net.add_node(username, name=username, layer=layer+1, retweeted="true", mentioned="true")
 		else:
 			if( has_igraph ):
-				net.add_vertices(1)
-				i = len(net.vs)-1
+				net.add_vertex(username)
+				i = net.vs.find(username).index
 				net.vs[i]["name"] = username
+				net.vs[i]["label"] = username
 				net.vs[i]["layer"] = layer+1
 				net.vs[i]["retweeted"] = "false"
 				net.vs[i]["mentioned"] = "true"
@@ -97,12 +110,13 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				net.add_node(username, name=username, layer=layer+1, retweeted="false", mentioned="true")
 		nodeNames.add(username)
 	for username in retweetedUsernames:
-		if( username in nodeNames or username in mentionedUsernames ):
-			next
+		if( username in nodeNames ):
+			continue
 		if( has_igraph ):
-			net.add_vertices(1)
-			i = len(net.vs)-1
+			net.add_vertex(username)
+			i = net.vs.find(username).index
 			net.vs[i]["name"] = username
+			net.vs[i]["label"] = username
 			net.vs[i]["layer"] = layer+1
 			net.vs[i]["retweeted"] = "true"
 			net.vs[i]["mentioned"] = "false"
@@ -117,8 +131,12 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 			if( has_igraph ):
 				srcID = net.vs.find(name=srcUser).index
 				dstID = net.vs.find(name=dstUser).index
-				net.add_edge(srcID,dstID)
+				# Only add edge if it doesn't exist
+				if( net.get_eid(srcID,dstID,directed=True,error=False) == -1 ):
+					net.add_edge(srcID,dstID)
 			else:
+				# We didn't declare a multigraph, so networkx will ignore
+				# duplicate edges
 				net.add_edge(srcUser, dstUser)
 	for srcUser in mentioned.keys():
 		mts = mentioned[srcUser]
@@ -126,13 +144,27 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 			if( has_igraph ):
 				srcID = net.vs.find(name=srcUser).index
 				dstID = net.vs.find(name=dstUser).index
-				net.add_edge(srcID,dstID)
+				# Only add edge if it doesn't exist
+				if( net.get_eid(srcID,dstID,directed=True,error=False) == -1 ):
+					net.add_edge(srcID,dstID)
 			else:
+				# We didn't declare a multigraph, so networkx will ignore
+				# duplicate edges
 				net.add_edge(srcUser, dstUser)
 
 	# Finally save it to disk
 	if( has_igraph ):
-		net.write_gml(newMapFilename)
+		try:
+			net.write_gml(newMapFilename)
+		except ig._igraph.InternalError:
+			# Sometimes igraph freaks out and won't save as GML
+			# but it saves fine as GraphML, and we can convert
+			msg = "Could not save GML file: We will save a GraphML file and "
+			msg += "what we can export to GML to aid in debugging"
+			log.log(log.warn, msg)
+			net.write_graphml(newMapFilename+".graphml")
+			tmp = ig.Graph.Read_GraphML(newMapFilename+".graphml")
+			tmp.write_gml(newMapFilename)
 	else:
 		nx.write_gml(net, newMapFilename)
 		nx.write_gml(net, newMapFilenameCytoscape)
