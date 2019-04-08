@@ -7,7 +7,7 @@ username,degree
 """
 
 import sys
-import networkx as nx
+import igraph as ig
 
 if __name__ == "__main__":
 	if( len(sys.argv) != 2 ):
@@ -15,17 +15,15 @@ if __name__ == "__main__":
 		sys.exit(1)
 	mapFilename = sys.argv[1]
 
-	orig = nx.read_gml(mapFilename)
+	orig = ig.Graph.Read_GML(mapFilename)
 
-	users = dict()
+	users = []
 
-	for user in orig.nodes(data=True):
-		name = user[1]["name"]
-		degree = orig.in_degree(name)
-		users[name] = degree
+	for i,e in enumerate(orig.vs):
+		users.append((e["name"], orig.degree(i, mode="in")))
 
 	try:
-		for username, degree in (sorted(users.items(), key=lambda n: n[1], reverse=True)):
+		for username, degree in (sorted(users, key=lambda n: n[1], reverse=True)):
 			print("%s,%d" % (username, degree))
 	except (BrokenPipeError, IOError):
 		pass # Behave yourself when piped to 'head'
