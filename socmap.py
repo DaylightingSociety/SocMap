@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Dependencies
-import argparse, sys, signal, os, threading
+import argparse, sys, signal, os, threading, math
 import tweepy
 
 # Local imports
@@ -34,6 +34,9 @@ def parseOptions():
 	parser.add_argument("-n", "--numtweets", default=1000,
 	                    action="store", type=int, dest="numtweets",
 	                    help="How many tweets to download from each user")
+	parser.add_argument("-M", "--maxreferences", default=math.inf,
+	                    action="store", type=int, dest="maxreferences",
+	                    help="Maximum number of retweeted and mentioned users to track per user")
 	parser.add_argument("-w", "--workdir", default=currentdir+"/work",
 	                    action="store", type=str, dest="workdir",
 	                    help="Where to store temporary files")

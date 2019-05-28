@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Dependencies
-import tweepy, os, jsonpickle, re, json, datetime, time, gzip
+import tweepy, os, jsonpickle, re, json, datetime, time, gzip, math
 import analyze, log
 
 class Tweet(object):
@@ -113,16 +113,18 @@ def getUserTweets(api, username, tweetdir, numtweets, compression):
 	saveTweetsToFile(username, tweets, tweetdir, compression)
 
 # Parse user tweets, return [[people they mentioned], [people they retweeted]]
-def getUserReferences(username, tweetdir):
+# Maximum length of either list is `maxreferences` (default: no limit)
+def getUserReferences(username, tweetdir, maxreferences=math.inf):
 	tweets = loadTweetsFromFile(username, tweetdir)
 	retweeted = set()
 	mentioned = set()
 	for tweet in tweets:
-		if( isinstance(tweet, Retweet) ):
+		if( isinstance(tweet, Retweet) and len(retweeted) < maxreferences ):
 			retweeted.add(tweet.source)
 		else:
 			for user in tweet.mentions:
-				mentioned.add(user)
+				if( len(mentioned) < maxreferences ):
+					mentioned.add(user)
 	return [mentioned, retweeted]
 
 def deleteUserTweets(username, tweetdir):
@@ -163,7 +165,7 @@ def getLayers(api, numLayers, options, userlist, olduserlist=set()):
 				getUserTweets(api, username, options.tweetdir, options.numtweets, options.compress)
 			if( not username in olduserlist ):
 				olduserlist.add(username)
-				mentions, rts = getUserReferences(username, options.tweetdir)
+				mentions, rts = getUserReferences(username, options.tweetdir, options.maxreferences)
 				if( len(rts) > 0 ):
 					nextLayerRTs[username] = list(rts)
 				if( len(mentions) > 0 ):
