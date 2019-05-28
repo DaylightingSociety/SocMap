@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Dependencies
-import tweepy, os, jsonpickle, re, json, datetime, time, gzip, math
+import tweepy, os, jsonpickle, re, json, datetime, time, gzip
 import analyze, log
 
 class Tweet(object):
@@ -114,7 +114,7 @@ def getUserTweets(api, username, tweetdir, numtweets, compression):
 
 # Parse user tweets, return [[people they mentioned], [people they retweeted]]
 # Maximum length of either list is `maxreferences` (default: no limit)
-def getUserReferences(username, tweetdir, maxreferences=math.inf):
+def getUserReferences(username, tweetdir, maxreferences=float('inf')):
 	tweets = loadTweetsFromFile(username, tweetdir)
 	retweeted = set()
 	mentioned = set()
@@ -160,6 +160,7 @@ def getLayers(api, numLayers, options, userlist, olduserlist=set()):
 			userlist = list(rtUsernames.union(mentionUsernames))
 		nextLayerRTs = dict()
 		nextLayerMentions = dict()
+		tweetCounts = dict()
 		for username in userlist:
 			if( not userTweetsPresent(username, options.tweetdir) ):
 				getUserTweets(api, username, options.tweetdir, options.numtweets, options.compress)
