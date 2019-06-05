@@ -4,15 +4,15 @@ import sys, os
 import igraph as ig
 
 """
-	This tool returns an insularity score within a given userlist. That is,
-	it tells you what percentage of retweets from the users listed are *other*
-	users in the list, rather than outsiders.
+	This tools returns a density measurement for each map provided as an argument
+	and prints the densities in order
 """
 
 if __name__ == "__main__":
-	if( len(sys.argv) != 2 ):
-		print("USAGE: %s <map.gml>" % sys.argv[0])
+	if( len(sys.argv) < 2 ):
+		print("USAGE: %s <map.gml> [map2.gml...]" % sys.argv[0])
 		sys.exit(1)
-	tweetmap = sys.argv[1]
-	net = ig.Graph.Read_GML(tweetmap)
-	print("%f" % net.density())
+
+	for fname in sys.argv[1:]:
+		net = ig.Graph.Read_GML(fname)
+		print("%s,%f" % (fname,net.density()))
