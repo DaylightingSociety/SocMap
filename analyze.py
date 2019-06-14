@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import re,sys
+from shutil import copyfile
 try:
 	import igraph as ig
 	has_igraph = True
@@ -11,6 +12,19 @@ except ImportError:
 	sys.stderr.write("ERROR: Module requires either igraph (preferred) or networkx (slower)")
 	sys.exit(1)
 import log
+
+# When igraph writes to GML, it saves the ids as floats
+# When it reads this data back in, it creates an extra "id"
+# attribute. If we then add vertices and write to GML again,
+# some vertices will have an "id" attribute and some won't,
+# and igraph will become *very* confused
+# Instead we'll strip the "id" attributes while loading.
+def igraphReadGML(filename):
+	net = ig.Graph.Read_GML(filename)
+	for i in range(0, len(net.vs)):
+		if( "id" in net.vs[i].attribute_names() ):
+			del net.vs[i]["id"]
+	return net
 
 # NetworkX produces GML files that include a numeric 'label' attribute.
 # This attribute prevents Cytoscape from opening the files, so we'll patch it.
@@ -50,15 +64,7 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				net.add_node(username, name=username, layer=0, retweeted="false", mentioned="false")
 	else:
 		if( has_igraph ):
-			# When igraph writes to GML, it saves the ids as floats
-			# When it reads this data back in, it creates an extra "id"
-			# attribute. If we then add vertices and write to GML again,
-			# some vertices will have an "id" attribute and some won't,
-			# and igraph will become *very* confused
-			net = ig.Graph.Read_GML(oldMapFilename)
-			for i in range(0, len(net.vs)):
-				if( "id" in net.vs[i].attribute_names() ):
-					del net.vs[i]["id"]
+			net = igraphReadGML(oldMapFilename)
 		else:
 			net = nx.read_gml(oldMapFilename)
 
@@ -167,5 +173,89 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 			tmp.write_gml(newMapFilename)
 	else:
 		nx.write_gml(net, newMapFilename)
-		nx.write_gml(net, newMapFilenameCytoscape)
+		copyfile(newMapFilename, newMapFilenameCytoscape)
 		patchGML(newMapFilenameCytoscape)
+
+def combineNetworks(file1, file2, outputfile):
+	if( has_igraph ):
+		net1 = igraphReadGML(file1)
+		net2 = igraphReadGML(file2)
+	else:
+		net1 = nx.read_gml(file1)
+		net2 = nx.read_gml(file2)
+		outputfileCytoscape = outputfile + "_cytoscape.gml"
+
+	# Now that the networks are loaded, we'll add net2 onto net1
+	# Start with a list of usernames
+	if( has_igraph ):
+		net1names = set(net1.vs.select()["name"])
+		net2names = set(net2.vs.select()["name"])
+	else:
+		net1names = set(net1.nodes())
+		net2names = set(net2.nodes())
+
+	# First, find all the nodes we have to add
+	# If a node exists in both graphs, merge the attributes
+	toadd = set()
+	for name in net2names:
+		if( not name in net1names ):
+			toadd.add(name)
+		else:
+			# Merge attributes
+			if( has_igraph ):
+				net1node = net1.vs.select(name=name)[0]
+				net2node = net2.vs.select(name=name)[0]
+				if( net2node["mentioned"] == "true" ):
+					net1node["mentioned"] = "true"
+				if( net2node["retweeted"] == "true" ):
+					net1node["retweeted"] = "true"
+				net1node["layer"] = min(net1node["layer"], net2node["layer"])
+			else:
+				if( net2.node[name]["mentioned"] == "true" ):
+					net1.node[name]["mentioned"] = "true"
+				if( net2.node[name]["retweeted"] == "true" ):
+					net1.node[name]["retweeted"] = "true"
+				net1.node[name]["layer"] = min(net1.node[name]["layer"], net2.node[name]["layer"])
+
+	# Add all the new nodes with attributes from network2
+	# Note: Loads attributes dynamically, so *should* be future-proof to adding
+	# more attributes to SocMap
+	for name in toadd:
+		if( has_igraph ):
+			attributes = net2.vs.select(name=name)[0].attributes()
+			net1.add_vertex(**attributes)
+		else:
+			net1.add_node(name, **net2.node[name])
+
+	# Now add all the new edges, copying edge attributes
+	# TODO: Merge edge attributes if edge already exists
+	# (Low priority since we don't currently have any edge attributes in SocMap)
+	if( has_igraph ):
+		for name in net2names:
+			net2node = net2.vs.select(name=name)[0]
+			edges = net2.incident(net2node)
+			for edge in edges:
+				e = net2.es[edge]
+				atts = e.attributes()
+				dstName = net2.vs[e.target]["name"]
+				srcID = net1.vs.select(name=name)[0].index
+				dstID = net1.vs.select(name=dstName)[0].index
+				# If edge does not exist, add it with same attributes
+				if( net1.get_eid(srcID, dstID, directed=True, error=False) == -1 ):
+					net1.add_edge(srcID, dstID, **atts)
+	else:
+		# NetworkX doesn't provide a clear way to get the edge attributes of
+		# all edges between two nodes (net.edges(src) discards the attributes!)
+		# So we'll iterate over edges instead of over nodes
+		edges = net2.edges.data()
+		for (src,dst,attributes) in edges:
+			if( not net1.has_edge(src, dst) ):
+				net1.add_edge(src, dst, **attributes)
+
+	# Finally, save the resulting network
+	if( has_igraph ):
+		net1.write_gml(outputfile)
+	else:
+		nx.write_gml(net1, outputfile)
+		copyfile(outputfile, outputfileCytoscape)
+		patchGML(outputfileCytoscape)
