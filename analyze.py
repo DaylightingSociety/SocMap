@@ -187,7 +187,7 @@ def combineNetworks(file1, file2, outputfile):
 
 	# Now that the networks are loaded, we'll add net2 onto net1
 	# Start with a list of usernames
-	if( has_graph ):
+	if( has_igraph ):
 		net1names = set(net1.vs.select()["name"])
 		net2names = set(net2.vs.select()["name"])
 	else:
@@ -235,8 +235,9 @@ def combineNetworks(file1, file2, outputfile):
 			net2node = net2.vs.select(name=name)[0]
 			edges = net2.incident(net2node)
 			for edge in edges:
-				atts = edge.attributes()
-				dstName = net2.vs[edge.target]["name"]
+				e = net2.es[edge]
+				atts = e.attributes()
+				dstName = net2.vs[e.target]["name"]
 				srcID = net1.vs.select(name=name)[0].index
 				dstID = net1.vs.select(name=dstName)[0].index
 				# If edge does not exist, add it with same attributes
