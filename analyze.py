@@ -256,6 +256,6 @@ def combineNetworks(file1, file2, outputfile):
 	if( has_igraph ):
 		net1.write_gml(outputfile)
 	else:
-		net1.write_gml(outputfile)
+		nx.write_gml(net1, outputfile)
 		copyfile(outputfile, outputfileCytoscape)
 		patchGML(outputfileCytoscape)
