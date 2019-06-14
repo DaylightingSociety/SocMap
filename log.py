@@ -19,6 +19,9 @@ logbuffer = queue.Queue()
 def logHandler(workdir, filename, debug):
 	if( filename == None ):
 		logfile = sys.stdout
+	# Check for absolute path (logfile starts with '/')
+	elif( len(filename) > 0 and filename[0] == "/" ):
+		logfile = open(filename, "w")
 	else:
 		logfile = open(workdir + "/" + filename, "w")
 	while(True):
