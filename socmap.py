@@ -62,7 +62,7 @@ def parseOptions():
 	                    help="File containing list of starting usernames")
 	parser.add_argument("-L", "--logfile", metavar="<file>", default=None,
 	                    action="store", type=str, dest="logfile",
-	                    help="Where to store log data relative to workdir (detault stdout)")
+	                    help="Where to store log data relative to workdir (default stdout)")
 	parser.add_argument("-d", "--debug", default=False,
 	                    action="store_true", dest="debug",
 	                    help="Enable debug-level logging")
