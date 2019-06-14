@@ -25,6 +25,8 @@ def parseOptions():
 	descr = "A Framework for Social-Network Mapping"
 	currentdir = os.path.dirname(os.path.realpath(__file__))
 	parser = Parser(description=descr)
+	# Can't ignore retweets *and* mentions or we'd have nothing to follow!
+	ignoreoptions = parser.add_mutually_exclusive_group()
 	parser.add_argument("-c", "--compress", default=False,
 	                    action="store_true", dest="compress", 
 	                    help="Compress downloaded tweets with GZIP")
@@ -37,6 +39,12 @@ def parseOptions():
 	parser.add_argument("-M", "--maxreferences", default=float('inf'),
 	                    action="store", type=int, dest="maxreferences",
 	                    help="Maximum number of retweeted and mentioned users to track per user")
+	ignoreoptions.add_argument("--ignorementions", default=False,
+						action="store_true", dest="ignorementions",
+						help="Do not follow mentions during mapping")
+	ignoreoptions.add_argument("--ignoreretweets", default=False,
+						action="store_true", dest="ignoreretweets",
+						help="Do not follow retweets during mapping")
 	parser.add_argument("-w", "--workdir", default=currentdir+"/work",
 	                    action="store", type=str, dest="workdir",
 	                    help="Where to store temporary files")

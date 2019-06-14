@@ -171,6 +171,10 @@ def getLayers(api, numLayers, options, userlist, olduserlist=set()):
 					nextLayerRTs[username] = list(rts)
 				if( len(mentions) > 0 ):
 					nextLayerMentions[username] = list(mentions)
+		if( options.ignoreretweets ):
+			nextLayerRTs.clear()
+		if( options.ignorementions ):
+			nextLayerMentions.clear()
 		log.log(log.info, "Layer " + str(layer) + " data collection complete, saving user lists...")
 		saveUserList(options.workdir, "layer" + str(layer) + "mentionedUsers", nextLayerMentions)
 		saveUserList(options.workdir, "layer" + str(layer) + "retweetedUsers", nextLayerRTs)
