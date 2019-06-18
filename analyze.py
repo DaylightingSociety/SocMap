@@ -46,31 +46,36 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 
 	# For layer 0 we need to explicitly create seed nodes
 	users = dict()
+	baseUserList = list(baseUsers.keys())
 	if( layer == 0 ):
 		if( has_igraph ):
 			net = ig.Graph(directed=True)
-			net.add_vertices(len(baseUsers))
-			for i in range(0, len(baseUsers)):
-				username = baseUsers[i]
+			net.add_vertices(len(baseUserList))
+			for i in range(0, len(baseUserList)):
+				username = baseUserList[i]
 				net.vs[i]["name"] = username
 				# NetworkX won't read our GML files unless we include a "label"
 				net.vs[i]["label"] = username
 				net.vs[i]["layer"] = 0
 				net.vs[i]["retweeted"] = "false"
 				net.vs[i]["mentioned"] = "false"
+				net.vs[i]["tweets"] = baseUsers[username]
 		else:
 			net = nx.DiGraph()
-			for username in baseUsers:
-				net.add_node(username, name=username, layer=0, retweeted="false", mentioned="false")
+			for username in baseUserList:
+				net.add_node(username, name=username, layer=0, retweeted="false", mentioned="false", tweets=baseUsers[username])
 	else:
+		# Load old network, update tweet counts for users we now have data on
 		if( has_igraph ):
 			net = igraphReadGML(oldMapFilename)
+			for username in baseUserList:
+				net.vs.select(name_eq=username)[0]["tweets"] = baseUsers[username]
 		else:
 			net = nx.read_gml(oldMapFilename)
+			for username in baseUserList:
+				net.node[username]["tweets"] = baseUsers[username]
 
 	# Now let's add the new users
-	# This is messy in networkx, because we have to add all of the users *and*
-	# their attributes up front -- there's no clean way to update them later
 	mentionedUsernames = set()
 	retweetedUsernames = set()
 	if( has_igraph ):
@@ -101,8 +106,9 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				net.vs[i]["layer"] = layer+1
 				net.vs[i]["retweeted"] = "true"
 				net.vs[i]["mentioned"] = "true"
+				net.vs[i]["tweets"] = 0
 			else:
-				net.add_node(username, name=username, layer=layer+1, retweeted="true", mentioned="true")
+				net.add_node(username, name=username, layer=layer+1, retweeted="true", mentioned="true", tweets=0)
 		else:
 			if( has_igraph ):
 				net.add_vertex(username)
@@ -112,8 +118,9 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				net.vs[i]["layer"] = layer+1
 				net.vs[i]["retweeted"] = "false"
 				net.vs[i]["mentioned"] = "true"
+				net.vs[i]["tweets"] = 0
 			else:
-				net.add_node(username, name=username, layer=layer+1, retweeted="false", mentioned="true")
+				net.add_node(username, name=username, layer=layer+1, retweeted="false", mentioned="true", tweets=0)
 		nodeNames.add(username)
 	for username in retweetedUsernames:
 		if( username in nodeNames ):
@@ -126,37 +133,38 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 			net.vs[i]["layer"] = layer+1
 			net.vs[i]["retweeted"] = "true"
 			net.vs[i]["mentioned"] = "false"
+			net.vs[i]["tweets"] = 0
 		else:
-			net.add_node(username, name=username, layer=layer+1, retweeted="true", mentioned="false")
+			net.add_node(username, name=username, layer=layer+1, retweeted="true", mentioned="false", tweets=0)
 		nodeNames.add(username)
 
 	# Next, let's add the edges
 	for srcUser in retweeted.keys():
-		rts = retweeted[srcUser]
+		rts = retweeted[srcUser].keys()
 		for dstUser in rts:
 			if( has_igraph ):
 				srcID = net.vs.find(name=srcUser).index
 				dstID = net.vs.find(name=dstUser).index
 				# Only add edge if it doesn't exist
 				if( net.get_eid(srcID,dstID,directed=True,error=False) == -1 ):
-					net.add_edge(srcID,dstID)
+					net.add_edge(srcID,dstID,weight=retweeted[srcUser][dstUser])
 			else:
 				# We didn't declare a multigraph, so networkx will ignore
 				# duplicate edges
-				net.add_edge(srcUser, dstUser)
+				net.add_edge(srcUser, dstUser, weight=retweeted[srcUser][dstUser])
 	for srcUser in mentioned.keys():
-		mts = mentioned[srcUser]
+		mts = mentioned[srcUser].keys()
 		for dstUser in mts:
 			if( has_igraph ):
 				srcID = net.vs.find(name=srcUser).index
 				dstID = net.vs.find(name=dstUser).index
 				# Only add edge if it doesn't exist
 				if( net.get_eid(srcID,dstID,directed=True,error=False) == -1 ):
-					net.add_edge(srcID,dstID)
+					net.add_edge(srcID,dstID,weight=mentioned[srcUser][dstUser])
 			else:
 				# We didn't declare a multigraph, so networkx will ignore
 				# duplicate edges
-				net.add_edge(srcUser, dstUser)
+				net.add_edge(srcUser, dstUser, weight=mentioned[srcUser][dstUser])
 
 	# Finally save it to disk
 	if( has_igraph ):

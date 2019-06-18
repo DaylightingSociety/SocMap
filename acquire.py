@@ -3,6 +3,7 @@
 # Dependencies
 import tweepy, os, jsonpickle, re, json, datetime, time, gzip
 import analyze, log
+from collections import defaultdict
 
 class Tweet(object):
 	def __init__(self, user, text, timestamp, mentions):
@@ -116,15 +117,15 @@ def getUserTweets(api, username, tweetdir, numtweets, compression):
 # Maximum length of either list is `maxreferences` (default: no limit)
 def getUserReferences(username, tweetdir, maxreferences=float('inf')):
 	tweets = loadTweetsFromFile(username, tweetdir)
-	retweeted = set()
-	mentioned = set()
+	retweeted = defaultdict(lambda: 0)
+	mentioned = defaultdict(lambda: 0)
 	for tweet in tweets:
 		if( isinstance(tweet, Retweet) and len(retweeted) < maxreferences ):
-			retweeted.add(tweet.source)
+			retweeted[tweet.source] += 1
 		else:
 			for user in tweet.mentions:
 				if( len(mentioned) < maxreferences ):
-					mentioned.add(user)
+					mentioned[user] += 1
 	return [mentioned, retweeted]
 
 def deleteUserTweets(username, tweetdir):
@@ -167,10 +168,11 @@ def getLayers(api, numLayers, options, userlist, olduserlist=set()):
 			if( not username in olduserlist ):
 				olduserlist.add(username)
 				mentions, rts = getUserReferences(username, options.tweetdir, options.maxreferences)
+				tweetCounts[username] = len(loadTweetsFromFile(username, options.tweetdir))
 				if( len(rts) > 0 ):
-					nextLayerRTs[username] = list(rts)
+					nextLayerRTs[username] = dict(rts)
 				if( len(mentions) > 0 ):
-					nextLayerMentions[username] = list(mentions)
+					nextLayerMentions[username] = dict(mentions)
 		if( options.ignoreretweets ):
 			nextLayerRTs.clear()
 		if( options.ignorementions ):
@@ -179,4 +181,4 @@ def getLayers(api, numLayers, options, userlist, olduserlist=set()):
 		saveUserList(options.workdir, "layer" + str(layer) + "mentionedUsers", nextLayerMentions)
 		saveUserList(options.workdir, "layer" + str(layer) + "retweetedUsers", nextLayerRTs)
 		log.log(log.info, "Saving network to disk...")
-		analyze.saveNetwork(options.mapdir, layer, userlist, nextLayerRTs, nextLayerMentions)
+		analyze.saveNetwork(options.mapdir, layer, tweetCounts, nextLayerRTs, nextLayerMentions)
