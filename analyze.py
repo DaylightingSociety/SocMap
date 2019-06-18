@@ -259,3 +259,78 @@ def combineNetworks(file1, file2, outputfile):
 		nx.write_gml(net1, outputfile)
 		copyfile(outputfile, outputfileCytoscape)
 		patchGML(outputfileCytoscape)
+
+# Takes a GML filename for input, a Python list of usernames, and an output
+# filename. All users from pruneUsernames are removed from the graph. Anything
+# not reachable from layer 0 is then pruned from the graph. Resulting network
+# is saved to outputfile. You can force low memory usage, which may be slow.
+def pruneNetwork(infile, pruneUsernames, outputfile, forceLowMemoryUsage=False):
+	if( has_igraph ):
+		net1 = igraphReadGML(infile)
+	else:
+		net1 = nx.read_gml(infile)
+		outputfileCytoscape = outputfile + "_cytoscape.gml"
+
+	# Delete all nodes with given usernames
+	if( has_igraph ):
+		toPrune = net1.vs.select(name_in=pruneUsernames)
+		net1.delete_vertices(toPrune)
+	else:
+		pruneNames = set(pruneUsernames)
+		toPrune = [n for n,a in net1.nodes(data=True) if a["name"] in pruneNames]
+		net1.remove_nodes_from(toPrune)
+
+	# Now find the seed nodes
+	if( has_igraph ):
+		seeds = net1.vs.select(layer_eq=0)
+	else:
+		# NOTE: We could combine this line with the block above to avoid
+		# iterating over the graph twice. This is cleaner, but slower.
+		# Consider if speed on large graphs is a serious issue.
+		seeds = [n for n,a in net1.nodes(data=True) if a["layer"] == 0]
+
+	# Now find everything reachable from the seed nodes
+	reachable = set()
+	if( has_igraph ):
+		for seed in seeds:
+			s = seed.index # subcomponents wants index form, not object
+			from_s = net1.subcomponent(s, mode=ig.OUT) # Returns list of indices
+			reachable.add(s)
+			reachable.update(from_s)
+	else:
+		for seed in seeds:
+			reachable.add(seed)
+			reachable.update(nx.descendants(net1, seed))
+
+	# Next, delete all nodes not reachable
+	if( has_igraph ):
+		if( forceLowMemoryUsage ):
+			# Delete nodes in place, involves multiple O(n) passes and going
+			# between C and Python a few times
+			reachable_nodes = [net1.vs[i]["name"] for i in reachable]
+			toPrune = net1.vs.select(name_notin=reachable_nodes)
+			net1.delete_vertices(toPrune)
+		else:
+			# Lots of memory? Great, copy just the part of the graph we need
+			# one O(n) pass, in C
+			net2 = net1.subgraph(reachable)
+	else:
+		if( forceLowMemoryUsage ):
+			toPrune = [n for n in net1.nodes() if n not in reachable]
+			net1.remove_nodes_from(toPrune)
+		else:
+			net2 = net1.subgraph(reachable)
+
+	# Finally, save results
+	if( has_igraph ):
+		if( forceLowMemoryUsage ):
+			net1.write_gml(outputfile)
+		else:
+			net2.write_gml(outputfile)
+	else:
+		if( forceLowMemoryUsage ):
+			nx.write_gml(net1, outputfile)
+		else:
+			nx.write_gml(net2, outputfile)
+		copyfile(outputfile, outputfileCytoscape)
+		patchGML(outputfileCytoscape)
