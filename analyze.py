@@ -146,12 +146,16 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				srcID = net.vs.find(name=srcUser).index
 				dstID = net.vs.find(name=dstUser).index
 				# Only add edge if it doesn't exist
-				if( net.get_eid(srcID,dstID,directed=True,error=False) == -1 ):
-					net.add_edge(srcID,dstID,weight=retweeted[srcUser][dstUser])
+				edgeID = net.get_eid(srcID,dstID,directed=True,error=False)
+				if( edgeID == -1 ):
+					net.add_edge(srcID,dstID,retweetCount=retweeted[srcUser][dstUser])
+				else:
+					net.es[edgeID]["retweetCount"] = retweeted[srcUser][dstUser]
 			else:
-				# We didn't declare a multigraph, so networkx will ignore
-				# duplicate edges
-				net.add_edge(srcUser, dstUser, weight=retweeted[srcUser][dstUser])
+				if( net.has_edge(srcUser, dstUser) ):
+					net[srcUser][dstUser]["retweetCount"] = retweeted[srcUser][dstUser]
+				else:
+					net.add_edge(srcUser, dstUser, retweetCount=retweeted[srcUser][dstUser])
 	for srcUser in mentioned.keys():
 		mts = mentioned[srcUser].keys()
 		for dstUser in mts:
@@ -159,12 +163,16 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				srcID = net.vs.find(name=srcUser).index
 				dstID = net.vs.find(name=dstUser).index
 				# Only add edge if it doesn't exist
-				if( net.get_eid(srcID,dstID,directed=True,error=False) == -1 ):
-					net.add_edge(srcID,dstID,weight=mentioned[srcUser][dstUser])
+				edgeID = net.get_eid(srcID,dstID,directed=True,error=False)
+				if( edgeID == -1 ):
+					net.add_edge(srcID,dstID,mentionCount=mentioned[srcUser][dstUser])
+				else:
+					net.es[edgeID]["mentionCount"] = mentioned[srcUser][dstUser]
 			else:
-				# We didn't declare a multigraph, so networkx will ignore
-				# duplicate edges
-				net.add_edge(srcUser, dstUser, weight=mentioned[srcUser][dstUser])
+				if( net.has_edge(srcUser, dstUser) ):
+					net[srcUser][dstUser]["mentionCount"] = mentioned[srcUser][dstUser]
+				else:
+					net.add_edge(srcUser, dstUser, mentionCount=mentioned[srcUser][dstUser])
 
 	# Finally save it to disk
 	if( has_igraph ):
