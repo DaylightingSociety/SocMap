@@ -146,12 +146,16 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				srcID = net.vs.find(name=srcUser).index
 				dstID = net.vs.find(name=dstUser).index
 				# Only add edge if it doesn't exist
-				if( net.get_eid(srcID,dstID,directed=True,error=False) == -1 ):
-					net.add_edge(srcID,dstID,weight=retweeted[srcUser][dstUser])
+				edgeID = net.get_eid(srcID,dstID,directed=True,error=False)
+				if( edgeID == -1 ):
+					net.add_edge(srcID,dstID,retweets=retweeted[srcUser][dstUser],mentions=0)
+				else:
+					net.es[edgeID]["retweets"] = retweeted[srcUser][dstUser]
 			else:
-				# We didn't declare a multigraph, so networkx will ignore
-				# duplicate edges
-				net.add_edge(srcUser, dstUser, weight=retweeted[srcUser][dstUser])
+				if( net.has_edge(srcUser, dstUser) ):
+					net[srcUser][dstUser]["retweets"] = retweeted[srcUser][dstUser]
+				else:
+					net.add_edge(srcUser, dstUser, retweets=retweeted[srcUser][dstUser], mentions=0)
 	for srcUser in mentioned.keys():
 		mts = mentioned[srcUser].keys()
 		for dstUser in mts:
@@ -159,12 +163,16 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 				srcID = net.vs.find(name=srcUser).index
 				dstID = net.vs.find(name=dstUser).index
 				# Only add edge if it doesn't exist
-				if( net.get_eid(srcID,dstID,directed=True,error=False) == -1 ):
-					net.add_edge(srcID,dstID,weight=mentioned[srcUser][dstUser])
+				edgeID = net.get_eid(srcID,dstID,directed=True,error=False)
+				if( edgeID == -1 ):
+					net.add_edge(srcID,dstID,mentions=mentioned[srcUser][dstUser],retweets=0)
+				else:
+					net.es[edgeID]["mentions"] = mentioned[srcUser][dstUser]
 			else:
-				# We didn't declare a multigraph, so networkx will ignore
-				# duplicate edges
-				net.add_edge(srcUser, dstUser, weight=mentioned[srcUser][dstUser])
+				if( net.has_edge(srcUser, dstUser) ):
+					net[srcUser][dstUser]["mentions"] = mentioned[srcUser][dstUser]
+				else:
+					net.add_edge(srcUser, dstUser, mentions=mentioned[srcUser][dstUser], retweets=0)
 
 	# Finally save it to disk
 	if( has_igraph ):
@@ -218,12 +226,14 @@ def combineNetworks(file1, file2, outputfile):
 				if( net2node["retweeted"] == "true" ):
 					net1node["retweeted"] = "true"
 				net1node["layer"] = min(net1node["layer"], net2node["layer"])
+				net1node["tweets"] = max(net1node["tweets"], net2node["tweets"])
 			else:
 				if( net2.node[name]["mentioned"] == "true" ):
 					net1.node[name]["mentioned"] = "true"
 				if( net2.node[name]["retweeted"] == "true" ):
 					net1.node[name]["retweeted"] = "true"
 				net1.node[name]["layer"] = min(net1.node[name]["layer"], net2.node[name]["layer"])
+				net1.node[name]["tweets"] = max(net1.node[name]["tweets"], net2.node[name]["tweets"])
 
 	# Add all the new nodes with attributes from network2
 	# Note: Loads attributes dynamically, so *should* be future-proof to adding
@@ -236,8 +246,6 @@ def combineNetworks(file1, file2, outputfile):
 			net1.add_node(name, **net2.node[name])
 
 	# Now add all the new edges, copying edge attributes
-	# TODO: Merge edge attributes if edge already exists
-	# (Low priority since we don't currently have any edge attributes in SocMap)
 	if( has_igraph ):
 		for name in net2names:
 			net2node = net2.vs.select(name=name)[0]
@@ -249,8 +257,12 @@ def combineNetworks(file1, file2, outputfile):
 				srcID = net1.vs.select(name=name)[0].index
 				dstID = net1.vs.select(name=dstName)[0].index
 				# If edge does not exist, add it with same attributes
-				if( net1.get_eid(srcID, dstID, directed=True, error=False) == -1 ):
+				edgeID = net1.get_eid(srcID, dstID, directed=True, error=False)
+				if( edgeID == -1 ):
 					net1.add_edge(srcID, dstID, **atts)
+				else:
+					net1.es[edgeID]["retweets"] = max(net1.es[edgeID]["retweets"], e["retweets"])
+					net1.es[edgeID]["mentions"] = max(net1.es[edgeID]["mentions"], e["mentions"])
 	else:
 		# NetworkX doesn't provide a clear way to get the edge attributes of
 		# all edges between two nodes (net.edges(src) discards the attributes!)
@@ -259,6 +271,9 @@ def combineNetworks(file1, file2, outputfile):
 		for (src,dst,attributes) in edges:
 			if( not net1.has_edge(src, dst) ):
 				net1.add_edge(src, dst, **attributes)
+			else:
+				net1[src][dst]["retweets"] = max(net1[src][dst]["retweets"],net2[src][dst]["retweets"])
+				net1[src][dst]["mentions"] = max(net1[src][dst]["mentions"],net2[src][dst]["mentions"])
 
 	# Finally, save the resulting network
 	if( has_igraph ):
