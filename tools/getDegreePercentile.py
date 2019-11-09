@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
 import sys, os
-import networkx as nx
+from collections import Counter
+try:
+	import igraph as ig
+	has_igraph = True
+except ImportError:
+	import networkx as nx
+	has_igraph = False
 
-if __name__ == "__main__":
-	if( len(sys.argv) != 3 ):
-		print("USAGE: %s <percentile> <inputfile.gml>" % sys.argv[0])
-		sys.exit(1)
-	percentile = int(sys.argv[1])
-	inFilename = sys.argv[2]
-
+def nxVersion(inFilename):
 	orig = nx.read_gml(inFilename)
 
 	degree = dict()
@@ -37,6 +37,27 @@ if __name__ == "__main__":
 			outDegree[out_dg] += 1
 		else:
 			outDegree[out_dg] = 1
+	return (numNodes, degree, inDegree, outDegree)
+
+def igraphVersion(inFilename):
+	g = ig.Graph.Read_GML(inFilename)
+	numNodes = len(g.vs)
+	degree = Counter(g.vs.degree())
+	inDegree = Counter(g.vs.indegree())
+	outDegree = Counter(g.vs.outdegree())
+	return (numNodes, degree, inDegree, outDegree)
+
+if __name__ == "__main__":
+	if( len(sys.argv) != 3 ):
+		print("USAGE: %s <percentile> <inputfile.gml>" % sys.argv[0])
+		sys.exit(1)
+	percentile = int(sys.argv[1])
+	inFilename = sys.argv[2]
+
+	if( has_igraph ):
+		(numNodes, degree, inDegree, outDegree) = igraphVersion(inFilename)
+	else:
+		(numNodes, degree, inDegree, outDegree) = nxVersion(inFilename)
 
 	def findThreshold(degree, name):
 		discoveredNodes = 0
