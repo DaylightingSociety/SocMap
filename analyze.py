@@ -73,7 +73,7 @@ def saveNetwork(mapDir, layer, baseUsers, retweeted, mentioned):
 		else:
 			net = nx.read_gml(oldMapFilename)
 			for username in baseUserList:
-				net.node[username]["tweets"] = baseUsers[username]
+				net.nodes[username]["tweets"] = baseUsers[username]
 
 	# Now let's add the new users
 	mentionedUsernames = set()
